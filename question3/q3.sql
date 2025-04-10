@@ -1,17 +1,22 @@
 -- (a) Triggers
 -- (1) Same car cannot be rented on 2 different rent with overlapping dates
+DROP TRIGGER IF EXISTS no_overlapping_rent ON rent;
+DROP FUNCTION IF EXISTS check_overlapping_rent();
+
 CREATE OR REPLACE FUNCTION check_overlapping_rent()
 RETURNS TRIGGER AS $$
 DECLARE
 	overlapping_count INT;
 BEGIN
-	SELECT COUNT(*)
-	INTO overlapping_count
+	SELECT COUNT(*) INTO overlapping_count
 	FROM rent r
-	WHERE r.plate = NEW.plate 
-		AND ((NEW.start_date BETWEEN r.start_date AND r.end_date)
-			OR (NEW.end_date BETWEEN r.start_date AND r.end_date)
-			OR (r.start_date <= NEW.start_date AND r.end_date >= NEW.end_date));
+	WHERE r.plate = NEW.plate
+	  AND r.ctid <> NEW.ctid  -- avoid comparing with itself
+	  AND (
+	    NEW.start_date BETWEEN r.start_date AND r.end_date OR
+	    NEW.end_date BETWEEN r.start_date AND r.end_date OR
+	    r.start_date <= NEW.start_date AND r.end_date >= NEW.end_date
+	  );
 
 	IF overlapping_count > 0 THEN
 		RAISE EXCEPTION 'Overlapping rent of car %', NEW.plate;
@@ -26,6 +31,9 @@ FOR EACH ROW
 EXECUTE FUNCTION check_overlapping_rent();
 
 -- (2) overlapping passenger
+DROP TRIGGER IF EXISTS a_no_overlapping_passenger ON ride;
+DROP FUNCTION IF EXISTS check_overlapping_passenger();
+
 CREATE OR REPLACE FUNCTION check_overlapping_passenger()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -35,6 +43,7 @@ BEGIN
 	INTO overlapping_count
 	FROM ride r
 	WHERE r.passenger = NEW.passenger 
+		AND r.ctid <> NEW.ctid  -- avoid comparing with itself
 		AND ((NEW.start_date BETWEEN r.start_date AND r.end_date)
 			OR (NEW.end_date BETWEEN r.start_date AND r.end_date)
 			OR (r.start_date <= NEW.start_date AND r.end_date >= NEW.end_date));
@@ -51,6 +60,9 @@ FOR EACH ROW
 EXECUTE FUNCTION check_overlapping_passenger();
 
 -- (3) number of passenger is less than or equal to the capacity
+DROP TRIGGER IF EXISTS b_passenger_capacity ON ride;
+DROP FUNCTION IF EXISTS check_passenger_capacity();
+
 CREATE OR REPLACE FUNCTION check_passenger_capacity()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -74,13 +86,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 CREATE OR REPLACE TRIGGER b_passenger_capacity
-BEFORE INSERT ON ride
+BEFORE INSERT OR UPDATE ON ride
 FOR EACH ROW
-EXECUTE FUNCTION check_passenger_capacity();
-
--- DROP TRIGGER a_passenger_capacity ON ride;	
+EXECUTE FUNCTION check_passenger_capacity();	
 
 -- (4) At least one passenger has license
+DROP TRIGGER IF EXISTS c_driver ON ride;
+DROP FUNCTION IF EXISTS check_driver();
+
 CREATE OR REPLACE FUNCTION check_driver()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -102,7 +115,8 @@ $$ LANGUAGE plpgsql;
 CREATE CONSTRAINT TRIGGER c_driver
 AFTER INSERT OR UPDATE ON ride
 DEFERRABLE INITIALLY DEFERRED
-FOR EACH ROW EXECUTE FUNCTION check_driver();
+FOR EACH ROW 
+EXECUTE FUNCTION check_driver();
 
 -- (b) Procedures
 -- (1) rent_solo
