@@ -130,10 +130,10 @@ $$
 BEGIN
 	INSERT INTO rent VALUES (customer, car, start_date, end_date);
 
-	INSERT INTO rider VALUES (car, start_date, end_date, passenger1);
-	INSERT INTO rider VALUES (car, start_date, end_date, passenger2);
-	INSERT INTO rider VALUES (car, start_date, end_date, passenger3);
-	INSERT INTO rider VALUES (car, start_date, end_date, passenger4);
+	INSERT INTO ride VALUES (car, start_date, end_date, passenger1);
+	INSERT INTO ride VALUES (car, start_date, end_date, passenger2);
+	INSERT INTO ride VALUES (car, start_date, end_date, passenger3);
+	INSERT INTO ride VALUES (car, start_date, end_date, passenger4);
 	EXCEPTION
     WHEN OTHERS THEN
         RAISE NOTICE 'Error occurred: %', SQLERRM;
